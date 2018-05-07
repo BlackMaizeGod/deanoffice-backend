@@ -34,3 +34,14 @@ Example:
 
 
 ```
+
+Annotation @PreAuthorize could be used to give access to endpoint for user who has specific role.
+
+Example:
+```
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @GetMapping("username")
+    public ResponseEntity getCurrentUserName(@CurrentUser ApplicationUser applicationUser) {
+      ApplicationUser applicationUser = userService.getApplicationUser()
+    }
+```
