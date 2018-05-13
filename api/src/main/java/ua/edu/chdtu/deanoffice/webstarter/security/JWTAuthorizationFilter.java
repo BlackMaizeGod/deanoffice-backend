@@ -16,7 +16,6 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,18 +32,17 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
     protected void doFilterInternal(HttpServletRequest req,
                                     HttpServletResponse res,
                                     FilterChain chain) throws IOException, ServletException {
-        String header = req.getHeader(HEADER_STRING);
-        if (header == null || !header.startsWith(TOKEN_PREFIX)) {
+        String token = getToken(req);
+        if (token == null) {
             chain.doFilter(req, res);
             return;
         }
-        UsernamePasswordAuthenticationToken authentication = getAuthentication(req);
+        UsernamePasswordAuthenticationToken authentication = getAuthentication(token);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         chain.doFilter(req, res);
     }
 
-    private UsernamePasswordAuthenticationToken getAuthentication(HttpServletRequest request) {
-        String token = request.getHeader(HEADER_STRING);
+    private UsernamePasswordAuthenticationToken getAuthentication(String token) {
         String userName;
         List<GrantedAuthority> authorities;
         if (token != null) {
@@ -65,5 +63,15 @@ public class JWTAuthorizationFilter extends BasicAuthenticationFilter {
             return null;
         }
         return null;
+    }
+
+    private String getToken(HttpServletRequest req) {
+        boolean isTokenInHeader = req.getHeader(HEADER_STRING) != null;
+
+        if (isTokenInHeader) {
+            return req.getHeader(HEADER_STRING).replace(TOKEN_PREFIX, "");
+        } else {
+            return req.getParameter("auth-jwt-token");
+        }
     }
 }
