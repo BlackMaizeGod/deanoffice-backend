@@ -13,7 +13,7 @@ import javax.annotation.PostConstruct;
 
 @Component
 @Scope(scopeName = "request", proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class ApplicationUserService {
+public class CurrentApplicationUserService {
 
     @Autowired
     ApplicationUserRepository applicationUserRepository;

@@ -31,7 +31,7 @@ Also, the current application user could be accessed in controller using Applica
 Example:
 ```
     @Autowired
-    ApplicationUserService userService;
+    CurrentApplicationUserService userService;
 
     @GetMapping("username")
     public ResponseEntity getCurrentUserName(@CurrentUser ApplicationUser applicationUser) {
