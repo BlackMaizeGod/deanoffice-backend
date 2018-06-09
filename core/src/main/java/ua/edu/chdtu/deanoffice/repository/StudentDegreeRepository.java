@@ -9,9 +9,10 @@ import java.util.List;
 
 public interface StudentDegreeRepository extends JpaRepository<StudentDegree, Integer> {
     @Query("SELECT sd from StudentDegree sd " +
-            "where sd.active = :active and sd.studentGroup.specialization.faculty.id = :facultyId " +
-            "order by sd.student.surname, sd.student.name, sd.student.patronimic, sd.studentGroup.name")
-    List<StudentDegree> findAllByActiveForFacultyId(
+            "where sd.active = :active " +
+            "and sd.specialization.faculty.id = :facultyId " +
+            "order by sd.student.surname, sd.student.name, sd.student.patronimic, sd.specialization.name")
+    List<StudentDegree> findAllByActive(
             @Param("active") boolean active,
             @Param("facultyId") Integer facultyId
     );
@@ -24,7 +25,17 @@ public interface StudentDegreeRepository extends JpaRepository<StudentDegree, In
 
     @Query("SELECT sd FROM StudentDegree sd " +
             "where sd.student.id = :student_id")
-    List<StudentDegree> findByStudentId(@Param("student_id") Integer studentId);
+    List<StudentDegree> findAllByStudentId(@Param("student_id") Integer studentId);
 
-    List<StudentDegree> findStudentDegreeByStudentGroupIdAndActive(@Param("groupId") Integer groupId, @Param("active") boolean active);
+    @Query("SELECT sd FROM StudentDegree sd " +
+            "where sd.student.id = :student_id and sd.active = true")
+    List<StudentDegree> findAllActiveByStudentId(@Param("student_id") Integer studentId);
+
+    @Query("select sd from StudentDegree sd " +
+            "where sd.studentGroup.id = :groupId and sd.active = :active " +
+            "order by sd.student.surname, sd.student.name, sd.student.patronimic")
+    List<StudentDegree> findStudentDegreeByStudentGroupIdAndActive(
+            @Param("groupId") Integer groupId,
+            @Param("active") boolean active
+    );
 }

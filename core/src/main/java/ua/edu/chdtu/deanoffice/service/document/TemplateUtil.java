@@ -7,10 +7,18 @@ import org.docx4j.openpackaging.parts.JaxbXmlPart;
 import org.docx4j.openpackaging.parts.relationships.Namespaces;
 import org.docx4j.openpackaging.parts.relationships.RelationshipsPart;
 import org.docx4j.relationships.Relationship;
+import org.docx4j.wml.Br;
 import org.docx4j.wml.ContentAccessor;
+import org.docx4j.wml.ObjectFactory;
+import org.docx4j.wml.P;
+import org.docx4j.wml.R;
+import org.docx4j.wml.RPr;
+import org.docx4j.wml.STBrType;
 import org.docx4j.wml.Tbl;
+import org.docx4j.wml.Tc;
 import org.docx4j.wml.Text;
 import org.docx4j.wml.Tr;
+import org.jvnet.jaxb2_commons.ppp.Child;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
@@ -27,6 +35,8 @@ public class TemplateUtil {
 
     private static final Logger log = LoggerFactory.getLogger(TemplateUtil.class);
     private static final String PLACEHOLDER_PREFIX = "#";
+
+    private static ObjectFactory factory = new ObjectFactory();
 
     public static List<Object> getAllElementsFromObject(Object obj, Class<?> toSearch) {
         List<Object> result = new ArrayList<>();
@@ -47,38 +57,93 @@ public class TemplateUtil {
         return result;
     }
 
-    public static void replaceTextPlaceholdersInTemplate(WordprocessingMLPackage template, Map<String, String> placeholdersValues) {
+    public static List<Tbl> getAllTablesFromDocument(WordprocessingMLPackage document) {
+        ContentAccessor accessor = document.getMainDocumentPart();
+        return getAllElementsFromObject(accessor, Tbl.class).stream().map(o -> (Tbl) o).collect(Collectors.toList());
+    }
+
+    public static List<Tr> getAllRowsFromTable(Tbl table) {
+        return table.getContent().stream().map(o -> (Tr) o).collect(Collectors.toList());
+    }
+
+    public static Tbl findTable(WordprocessingMLPackage document, String key) {
+        return findTable(getAllTablesFromDocument(document), key);
+    }
+
+    public static Tbl findTable(List<Tbl> tables, String templateKey) {
+        for (Tbl tbl : tables) {
+            List<Text> textElements = getAllTextsFromObject(tbl);
+            for (Text text : textElements) {
+                if (text.getValue() != null && text.getValue().contains(templateKey)) {
+                    return tbl;
+                }
+            }
+        }
+        log.warn("Could not find table with key {}", templateKey);
+        return null;
+    }
+
+    public static Object findParentNode(Child child, Class<?> nodeClass) {
+        Object result = child.getParent();
+        while (!result.getClass().equals(nodeClass)) {
+            if (result instanceof Child) {
+                result = ((Child) result).getParent();
+            } else {
+                break;
+            }
+        }
+        return result;
+    }
+
+    public static void replaceTextPlaceholdersInTemplate(WordprocessingMLPackage template,
+                                                         Map<String, String> placeholdersValues,
+                                                         Boolean replaceEmptyWithBlank) {
+        List<Text> placeholders = getTextsContainingPlaceholders(template);
+        replaceValuesInTextPlaceholders(placeholders, placeholdersValues, replaceEmptyWithBlank);
+    }
+
+    public static void replaceTextPlaceholdersInTemplate(WordprocessingMLPackage template,
+                                                         Map<String, String> placeholdersValues) {
         List<Text> placeholders = getTextsContainingPlaceholders(template);
         replaceValuesInTextPlaceholders(placeholders, placeholdersValues);
     }
 
-    private static void replaceValuesInTextPlaceholders(List<Text> placeholders, Map<String, String> replacements) {
+    public static void replaceValuesInTextPlaceholders(List<Text> placeholders,
+                                                       Map<String, String> replacements,
+                                                       Boolean replaceEmpty) {
         for (Text text : placeholders) {
             String replacement = replacements.get(text.getValue().trim().replaceFirst(PLACEHOLDER_PREFIX, ""));
             if (StringUtils.isEmpty(replacement)) {
                 log.debug("{} is empty", text.getValue());
             }
-            text.setValue(getValueSafely(replacement));
+            if (replaceEmpty || !StringUtils.isEmpty(replacement)) {
+                text.setValue(getValueSafely(replacement));
+            }
         }
     }
 
-    private static List<Text> getTextsContainingPlaceholders(WordprocessingMLPackage template) {
-        return getTextsFromContentAccessor(template.getMainDocumentPart());
+    public static void replaceValuesInTextPlaceholders(List<Text> placeholders,
+                                                       Map<String, String> replacements) {
+        replaceValuesInTextPlaceholders(placeholders, replacements, true);
     }
 
-    private static List<Text> getTextsFromContentAccessor(ContentAccessor contentAccessor) {
-        List<Object> texts = getAllElementsFromObject(contentAccessor, Text.class);
+    private static List<Text> getTextsContainingPlaceholders(WordprocessingMLPackage template) {
+        return getTextsPlaceholdersFromContentAccessor(template.getMainDocumentPart());
+    }
+
+    public static List<Text> getTextsPlaceholdersFromContentAccessor(ContentAccessor contentAccessor) {
+        List<Text> texts = getAllTextsFromObject(contentAccessor);
         List<Object> placeholders = new ArrayList<>();
         for (int i = 0; i < texts.size(); i++) {
-            Text text = ((Text) texts.get(i));
+            Text text = texts.get(i);
             if (isAPlaceholder(text)) {
                 placeholders.add(text);
                 continue;
             }
             if (text.getValue().trim().equals(PLACEHOLDER_PREFIX)) {
-                Iterator<Object> iterator = texts.listIterator(i + 1);
+                Iterator<Text> iterator = texts.listIterator(i + 1);
                 if (iterator.hasNext()) {
-                    Text potentialPlaceholder = (Text) iterator.next();
+                    Text potentialPlaceholder = iterator.next();
                     potentialPlaceholder.setValue(text.getValue() + potentialPlaceholder.getValue());
                     text.setValue("");
                     placeholders.add(potentialPlaceholder);
@@ -89,12 +154,23 @@ public class TemplateUtil {
         return placeholders.stream().map(o -> (Text) o).collect(Collectors.toList());
     }
 
+    public static List<Text> getAllTextsFromObject(Object object) {
+        return getAllElementsFromObject(object, Text.class).stream().map(o -> (Text) o).collect(Collectors.toList());
+    }
+
     public static void replacePlaceholdersWithBlank(WordprocessingMLPackage template, Set<String> placeholders) {
         List<Text> texts = getTextsContainingPlaceholders(template);
         for (Text text : texts) {
             if (placeholders.contains(text.getValue())) {
                 text.setValue("");
             }
+        }
+    }
+
+    public static void replacePlaceholdersWithBlank(WordprocessingMLPackage template) {
+        List<Text> texts = getTextsContainingPlaceholders(template);
+        for (Text text : texts) {
+            text.setValue("");
         }
     }
 
@@ -126,19 +202,6 @@ public class TemplateUtil {
         return text.getValue() != null && text.getValue().startsWith(PLACEHOLDER_PREFIX) && text.getValue().length() > 1;
     }
 
-    public static Tbl findTable(List<Object> tables, String templateKey) {
-        for (Object tbl : tables) {
-            List<Object> textElements = getAllElementsFromObject(tbl, Text.class);
-            for (Object text : textElements) {
-                Text textElement = (Text) text;
-                if (textElement.getValue() != null && textElement.getValue().trim().equals(templateKey)) {
-                    return (Tbl) tbl;
-                }
-            }
-        }
-        return null;
-    }
-
     public static void addRowToTable(Tbl reviewTable, Tr templateRow, int rowNumber, Map<String, String> replacements) {
         Tr workingRow = XmlUtils.deepCopy(templateRow);
         replaceInRow(workingRow, replacements);
@@ -146,8 +209,82 @@ public class TemplateUtil {
     }
 
     public static void replaceInRow(Tr tableRow, Map<String, String> replacements) {
-        List<Text> textElements = getTextsFromContentAccessor(tableRow);
+        List<Text> textElements = getTextsPlaceholdersFromContentAccessor(tableRow);
         replaceValuesInTextPlaceholders(textElements, replacements);
+    }
+
+    public static void replaceInCell(Tc tableCell, Map<String, String> replacements) {
+        List<Text> textElements = getTextsPlaceholdersFromContentAccessor(tableCell);
+        replaceValuesInTextPlaceholders(textElements, replacements);
+    }
+
+    public static void replaceInCell(Tr row, int cellIndex, Map<String, String> replacements) {
+        fixRow(row);
+        List<Object> cells = row.getContent();
+        Tc tableCell = ((JAXBElement<Tc>) (cells.get(cellIndex))).getValue();
+        replaceInCell(tableCell, replacements);
+    }
+
+    private static void fixRow(Tr row) {
+        List<Object> cells = row.getContent();
+        JAXBElement jaxbElement = (JAXBElement) (cells.get(cells.size() - 1));
+        if (!(jaxbElement.getValue() instanceof Tc)) {
+            cells.remove(cells.size() - 1);
+            fixRow(row);
+        }
+    }
+
+    public static void cloneLastCellInRow(Tr templateRow) {
+        fixRow(templateRow);
+        List<Object> cells = templateRow.getContent();
+        JAXBElement<Tc> jaxbElement = (JAXBElement<Tc>) (cells.get(cells.size() - 1));
+        Tc lastCell;
+        lastCell = jaxbElement.getValue();
+        Tc result = XmlUtils.deepCopy(lastCell);
+        templateRow.getContent().add(new JAXBElement<Tc>(jaxbElement.getName(), Tc.class, result));
+    }
+
+    public static void copyTable(WordprocessingMLPackage template, int tableIndex) {
+        Tbl table = (Tbl) getAllElementsFromObject(template.getMainDocumentPart(), Tbl.class).get(tableIndex);
+        template.getMainDocumentPart().addObject(XmlUtils.deepCopy(table));
+    }
+
+    public static void addPageBreak(WordprocessingMLPackage document) {
+        Br breakObject = createPageBreak();
+        P paragraph = createParagraph();
+        paragraph.getContent().add(breakObject);
+
+        document.getMainDocumentPart().addObject(paragraph);
+    }
+
+    public static Br createPageBreak() {
+        Br breakObject = new Br();
+        breakObject.setType(STBrType.PAGE);
+        return breakObject;
+    }
+
+    public static Br createLineBreak() {
+        Br breakObject = new Br();
+        breakObject.setType(STBrType.TEXT_WRAPPING);
+        return breakObject;
+    }
+
+    public static P createParagraph() {
+        return factory.createP();
+    }
+
+    public static Text createText(String value) {
+        Text text = factory.createText();
+        text.setValue(value);
+        return text;
+    }
+
+    public static R createR(){
+        return factory.createR();
+    }
+
+    public static RPr createRPr(){
+        return factory.createRPr();
     }
 
     public static String getValueSafely(String value, String ifNullOrEmpty) {

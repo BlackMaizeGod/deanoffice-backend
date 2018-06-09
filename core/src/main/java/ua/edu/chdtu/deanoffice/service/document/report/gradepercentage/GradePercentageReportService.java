@@ -26,11 +26,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static ua.edu.chdtu.deanoffice.service.document.DocumentIOService.TEMPLATES_PATH;
+
 
 @Service
 public class GradePercentageReportService {
 
-    private static final String TEMPLATES_PATH = "docs/templates/";
     private static final String TEMPLATE = TEMPLATES_PATH + "GradesPercentage.docx";
     private static final Logger log = LoggerFactory.getLogger(DiplomaSupplementService.class);
 
@@ -75,11 +76,8 @@ public class GradePercentageReportService {
     }
 
     private void fillTableWithGrades(WordprocessingMLPackage template, List<StudentsReport> studentsReports) {
-        List<Object> tables = TemplateUtil.getAllElementsFromObject(template.getMainDocumentPart(), Tbl.class);
-        String tableWithGradesKey = "№";
-        Tbl tempTable = TemplateUtil.findTable(tables, tableWithGradesKey);
+        Tbl tempTable = TemplateUtil.findTable(template, "№");
         if (tempTable == null) {
-            log.warn("Couldn't find table that contains: " + tableWithGradesKey);
             return;
         }
         List<Object> gradeTableRows = TemplateUtil.getAllElementsFromObject(tempTable, Tr.class);

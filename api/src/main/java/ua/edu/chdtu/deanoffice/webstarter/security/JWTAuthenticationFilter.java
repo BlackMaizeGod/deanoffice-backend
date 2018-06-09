@@ -1,6 +1,5 @@
 package ua.edu.chdtu.deanoffice.webstarter.security;
 
-
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import io.jsonwebtoken.Claims;

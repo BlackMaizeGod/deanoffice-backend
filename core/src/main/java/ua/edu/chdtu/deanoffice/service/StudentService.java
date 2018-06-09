@@ -29,7 +29,16 @@ public class StudentService {
         );
     }
 
-    public Student create(Student student) {
+    public List<Student> searchByFullName(String name, String surname, String patronimic, int facultyId) {
+         return studentRepository.findAllByFullNameUkr(
+                toCapitalizedCase(name),
+                toCapitalizedCase(surname),
+                toCapitalizedCase(patronimic),
+                facultyId
+        );
+    }
+
+    public Student save(Student student) {
         student.setName(toCapitalizedCase(student.getName()));
         student.setSurname(toCapitalizedCase(student.getSurname()));
         student.setPatronimic(toCapitalizedCase(student.getPatronimic()));
@@ -39,13 +48,9 @@ public class StudentService {
         return this.studentRepository.save(student);
     }
 
-    public void update(Student student) {
-        studentRepository.save(student);
-    }
-
-    public void addPhoto(byte[] photo, int studentId) {
+    public void addPhoto(String photoUrl, int studentId) {
         Student student = studentRepository.getOne(studentId);
-        student.setPhoto(photo);
+        student.setPhotoUrl(photoUrl);
         studentRepository.save(student);
     }
 }

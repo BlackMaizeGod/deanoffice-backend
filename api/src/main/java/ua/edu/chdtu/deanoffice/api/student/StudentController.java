@@ -2,7 +2,6 @@ package ua.edu.chdtu.deanoffice.api.student;
 
 import com.fasterxml.jackson.annotation.JsonView;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,13 +13,18 @@ import org.springframework.web.bind.annotation.RestController;
 import ua.edu.chdtu.deanoffice.api.general.ExceptionHandlerAdvice;
 import ua.edu.chdtu.deanoffice.api.student.dto.StudentDTO;
 import ua.edu.chdtu.deanoffice.api.student.dto.StudentView;
+import ua.edu.chdtu.deanoffice.entity.ApplicationUser;
 import ua.edu.chdtu.deanoffice.entity.Student;
+import ua.edu.chdtu.deanoffice.entity.StudentDegree;
+import ua.edu.chdtu.deanoffice.entity.superclasses.NameEntity;
 import ua.edu.chdtu.deanoffice.service.StudentService;
+import ua.edu.chdtu.deanoffice.webstarter.security.CurrentUser;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
-import static ua.edu.chdtu.deanoffice.api.general.parser.Parser.parse;
+import static ua.edu.chdtu.deanoffice.api.general.mapper.Mapper.map;
 
 @RestController
 @RequestMapping("/students")
@@ -35,22 +39,25 @@ public class StudentController {
     @JsonView(StudentView.Search.class)
     @GetMapping("/search")
     public List searchStudentByFullName(
-            @RequestParam(value = "name", defaultValue = "", required = false) String name,
             @RequestParam(value = "surname", defaultValue = "", required = false) String surname,
-            @RequestParam(value = "patronimic", defaultValue = "", required = false) String patronimic
-    ) {
-        List<Student> foundStudent = studentService.searchByFullName(name, surname, patronimic);
-        List<StudentDTO> foundStudentDTO = parse(foundStudent, StudentDTO.class);
-        foundStudentDTO.forEach(studentDTO -> {
-            Student student = foundStudent.get(foundStudentDTO.indexOf(studentDTO));
+            @RequestParam(value = "name", defaultValue = "", required = false) String name,
+            @RequestParam(value = "patronimic", defaultValue = "", required = false) String patronimic,
+            @CurrentUser ApplicationUser user
+            ) {
+        List<Student> foundStudents = studentService.searchByFullName(name, surname, patronimic, user.getFaculty().getId());
+        List<StudentDTO> foundStudentsDTO = map(foundStudents, StudentDTO.class);
+        foundStudentsDTO.forEach(studentDTO -> {
+            Student student = foundStudents.get(foundStudentsDTO.indexOf(studentDTO));
             studentDTO.setGroups(getGroupNamesForStudent(student));
         });
-        return foundStudentDTO;
+        return foundStudentsDTO;
     }
 
     private String getGroupNamesForStudent(Student student) {
         return student.getDegrees().stream()
-                .map(studentDegree -> studentDegree.getStudentGroup().getName())
+                .map(StudentDegree::getStudentGroup)
+                .filter(Objects::nonNull)
+                .map(NameEntity::getName)
                 .collect(Collectors.joining(", "));
     }
 
@@ -58,13 +65,13 @@ public class StudentController {
     @GetMapping("/{student_id}")
     public ResponseEntity getStudentsById(@PathVariable("student_id") Integer studentId) {
         Student student = studentService.findById(studentId);
-        return ResponseEntity.ok(parse(student, StudentDTO.class));
+        return ResponseEntity.ok(map(student, StudentDTO.class));
     }
 
-    @PutMapping("/")
+    @PutMapping
     public ResponseEntity updateStudent(@RequestBody Student student) {
         try {
-            studentService.update(student);
+            studentService.save(student);
             return ResponseEntity.ok().build();
         } catch (Exception exception) {
             return handleException(exception);
@@ -72,23 +79,19 @@ public class StudentController {
     }
 
     @PutMapping("/{student_id}/photo")
-    public ResponseEntity uploadPhotoForStudent(@RequestBody byte[] photo, @PathVariable(value = "student_id") int studentId) {
+    public ResponseEntity uploadPhotoForStudent(@RequestBody String photoUrl, @PathVariable(value = "student_id") int studentId) {
         try {
-            studentService.addPhoto(photo, studentId);
+            studentService.addPhoto(photoUrl, studentId);
             return ResponseEntity.ok().build();
         } catch (Exception exception) {
             return handleException(exception);
         }
     }
 
-    @GetMapping("/{id}/photo")
-    public ResponseEntity getStudentPhoto(@PathVariable(value = "id") Integer id) {
+    @GetMapping("/{student_id}/photo")
+    public ResponseEntity getStudentPhoto(@PathVariable(value = "student_id") Integer id) {
         Student student = studentService.findById(id);
-        if (student == null) {
-            return ResponseEntity.notFound().eTag("Not found student with id " + id).build();
-        }
-        byte[] photo = student.getPhoto();
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(photo);
+        return ResponseEntity.ok().body(student.getPhotoUrl());
     }
 
     private ResponseEntity handleException(Exception exception) {

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static ua.edu.chdtu.deanoffice.service.document.DocumentIOService.TEMPLATES_PATH;
 import static ua.edu.chdtu.deanoffice.service.document.TemplateUtil.addRowToTable;
 import static ua.edu.chdtu.deanoffice.service.document.TemplateUtil.findTable;
 import static ua.edu.chdtu.deanoffice.service.document.TemplateUtil.getAllElementsFromObject;
@@ -34,7 +35,6 @@ import static ua.edu.chdtu.deanoffice.service.document.TemplateUtil.replaceTextP
 @Service
 public class ReportsCoursesService {
 
-    private static final String TEMPLATES_PATH = "docs/templates/";
     private static final String TEMPLATE = TEMPLATES_PATH + "PredmJourn.docx";
     private static Logger log = LoggerFactory.getLogger(DiplomaSupplementService.class);
 
@@ -81,11 +81,8 @@ public class ReportsCoursesService {
     }
 
     private void fillTableWithGrades(WordprocessingMLPackage template, List<CourseReport> courseReports) {
-        List<Object> tables = getAllElementsFromObject(template.getMainDocumentPart(), Tbl.class);
-        String tableWithGradesKey = "#Pred";
-        Tbl tempTable = findTable(tables, tableWithGradesKey);
+        Tbl tempTable = findTable(template, "#Pred");
         if (tempTable == null) {
-            log.warn("Couldn't find table that contains: " + tableWithGradesKey);
             return;
         }
         List<Object> gradeTableRows = getAllElementsFromObject(tempTable, Tr.class);

@@ -17,4 +17,12 @@ public class DegreeService {
     public List<Degree> getDegrees() {
         return degreeRepository.findAll();
     }
+
+    public Degree getById(Integer degreeId) {
+        return degreeRepository.findOne(degreeId);
+    }
+
+    public Degree getByName(String degreeName) {
+        return degreeRepository.findByName(degreeName);
+    }
 }
