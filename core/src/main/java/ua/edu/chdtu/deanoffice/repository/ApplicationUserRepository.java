@@ -7,4 +7,5 @@ import ua.edu.chdtu.deanoffice.entity.ApplicationUser;
 @Repository
 public interface ApplicationUserRepository extends JpaRepository<ApplicationUser, Long> {
     ApplicationUser findByUsername(String username);
+    ApplicationUser findById(int id);
 }
