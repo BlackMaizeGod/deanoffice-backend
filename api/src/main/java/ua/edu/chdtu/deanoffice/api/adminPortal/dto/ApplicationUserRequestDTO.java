@@ -2,15 +2,14 @@ package ua.edu.chdtu.deanoffice.api.adminPortal.dto;
 
 import lombok.Getter;
 import lombok.Setter;
-import ua.edu.chdtu.deanoffice.api.faculty.dto.FacultyDTO;
 
 @Getter
 @Setter
-public class ApplicationUserDTO {
-    private long id;
+public class ApplicationUserRequestDTO {
+    private int id;
     private String firstName;
     private String lastName;
     private String username;
-    private FacultyDTO faculty;
+    private String password;
     private int facultyId;
 }
