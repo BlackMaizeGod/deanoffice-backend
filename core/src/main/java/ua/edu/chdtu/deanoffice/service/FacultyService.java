@@ -3,6 +3,7 @@ package ua.edu.chdtu.deanoffice.service;
 import org.springframework.stereotype.Service;
 import ua.edu.chdtu.deanoffice.entity.Faculty;
 import ua.edu.chdtu.deanoffice.repository.FacultyRepository;
+import java.util.List;
 
 @Service
 public class FacultyService {
@@ -32,6 +33,15 @@ public class FacultyService {
             throw new Exception("403");
         }
     }
+
+    public List<Faculty> getAll(){
+        return facultyRepository.findAll();
+    }
+
+    public Faculty findById(int id){
+        return facultyRepository.findById(id);
+    }
+
 
     public Faculty getByName(String name) {
         return facultyRepository.findByName(name);
