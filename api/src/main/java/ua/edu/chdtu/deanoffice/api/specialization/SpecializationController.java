@@ -31,6 +31,7 @@ import ua.edu.chdtu.deanoffice.service.SpecializationService;
 import ua.edu.chdtu.deanoffice.webstarter.security.CurrentUser;
 
 import java.net.URI;
+import java.util.Comparator;
 import java.util.List;
 
 import static ua.edu.chdtu.deanoffice.api.general.Util.getNewResourceLocation;
@@ -64,6 +65,10 @@ public class SpecializationController {
     ) {
         try{
             List<Specialization> specializations = specializationService.getAllByActive(active, user.getFaculty().getId());
+            specializations.sort(Comparator.comparing(Specialization::getQualification)
+                    .thenComparing(specialization -> specialization.getSpeciality().getName())
+                    .thenComparing(Specialization::getName)
+            );
             return ResponseEntity.ok(Mapper.map(specializations, SpecializationDTO.class));
         } catch (Exception exception) {
             return handleException(exception);
