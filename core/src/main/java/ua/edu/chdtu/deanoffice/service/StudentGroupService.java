@@ -1,13 +1,14 @@
 package ua.edu.chdtu.deanoffice.service;
 
 import org.springframework.stereotype.Service;
+import ua.edu.chdtu.deanoffice.entity.ApplicationUser;
 import ua.edu.chdtu.deanoffice.entity.StudentGroup;
 import ua.edu.chdtu.deanoffice.repository.CurrentYearRepository;
 import ua.edu.chdtu.deanoffice.repository.StudentGroupRepository;
 
+import java.util.HashMap;
 import java.util.List;
-
-import static ua.edu.chdtu.deanoffice.Constants.FACULTY_ID;
+import java.util.Map;
 
 @Service
 public class StudentGroupService {
@@ -61,5 +62,15 @@ public class StudentGroupService {
     public void delete(List<StudentGroup> studentGroups) {
         studentGroups.forEach(studentGroup -> studentGroup.setActive(false));
         studentGroupRepository.save(studentGroups);
+    }
+
+    public List<StudentGroup> getGroupsThatAreStudyingSameCourseTo(Integer courseIds, Integer facultyId) {
+        return studentGroupRepository.findGroupsThatAreStudyingSameCourseTo(courseIds, facultyId);
+    }
+
+    public Map<Integer, List<StudentGroup>> getGroupsThatAreStudyingSameCoursesTo(List<Integer> courseIds, Integer facultyId) {
+        Map<Integer, List<StudentGroup>> map = new HashMap<>();
+        courseIds.forEach(courseId -> map.put(courseId, studentGroupRepository.findGroupsThatAreStudyingSameCourseTo(courseId, facultyId)));
+        return map;
     }
 }
