@@ -126,11 +126,15 @@ public class GradeService {
         gradeRepository.delete(gradeId);
     }
 
-    public List<StudentDegree> getStudentDegreesThatHasNotGoodMark(List<StudentDegree> studentDegrees, CourseForGroup courseForGroup) {
+    public List<StudentDegree> filterStudentByGrade(List<StudentDegree> studentDegrees, CourseForGroup courseForGroup, boolean isGoodMark) {
         List<StudentDegree> studentDegreeResult = new ArrayList<>();
         studentDegrees.forEach(studentDegree -> {
-            boolean isStudentHasGoodMark = gradeRepository.isStudentHaveGoodMarkFromCourse(studentDegree.getId(), studentDegree.getStudentGroup().getId(), courseForGroup.getCourse().getId());
-            if (!isStudentHasGoodMark)
+            boolean isStudentHasGoodMark = gradeRepository.isStudentHaveGoodMarkFromCourse(
+                    studentDegree.getId(),
+                    studentDegree.getStudentGroup().getId(),
+                    courseForGroup.getCourse().getId()
+            );
+            if (isStudentHasGoodMark == isGoodMark)
                 studentDegreeResult.add(studentDegree);
         });
         return studentDegreeResult;
