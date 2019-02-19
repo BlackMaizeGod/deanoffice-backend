@@ -2,6 +2,7 @@ package ua.edu.chdtu.deanoffice.service;
 
 import org.springframework.stereotype.Service;
 import ua.edu.chdtu.deanoffice.entity.StudentGroup;
+import ua.edu.chdtu.deanoffice.entity.TuitionForm;
 import ua.edu.chdtu.deanoffice.repository.CurrentYearRepository;
 import ua.edu.chdtu.deanoffice.repository.StudentGroupRepository;
 
@@ -44,6 +45,10 @@ public class StudentGroupService {
         return studentGroupRepository.findGroupsByDegreeAndYear(degreeId, year, getCurrentYear(), facultyId);
     }
 
+    public List<StudentGroup> getGroupsByDegreeAndYearAndTuitionForm(int degreeId, int year, int facultyId, TuitionForm tuitionForm ) {
+        return studentGroupRepository.findGroupsByDegreeAndYearAndTuitionForm(degreeId, year, getCurrentYear(), facultyId, tuitionForm);
+    }
+
     public List<StudentGroup> getAllByActive(boolean onlyActive, int facultyId) {
         if (onlyActive) {
             return this.studentGroupRepository.findAllActiveByFaculty(facultyId);
@@ -79,5 +84,10 @@ public class StudentGroupService {
         Map<Integer, List<StudentGroup>> map = new HashMap<>();
         courseIds.forEach(courseId -> map.put(courseId, studentGroupRepository.findGroupsThatAreStudyingSameCourseTo(courseId, facultyId)));
         return map;
+    }
+
+    public StudentGroup getByNameAndFacultyId(String groupName, int facultyId){
+        List<StudentGroup> studentGroups = studentGroupRepository.findByName(groupName, facultyId);
+        return (studentGroups.isEmpty()) ? null : studentGroups.get(0);
     }
 }

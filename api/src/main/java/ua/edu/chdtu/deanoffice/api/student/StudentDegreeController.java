@@ -32,9 +32,14 @@ import ua.edu.chdtu.deanoffice.service.security.FacultyAuthorizationService;
 import ua.edu.chdtu.deanoffice.webstarter.security.CurrentUser;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static ua.edu.chdtu.deanoffice.api.general.Util.getNewResourceLocation;
 
@@ -159,27 +164,26 @@ public class StudentDegreeController {
         }
     }
 
-    @JsonView(StudentView.Degrees.class)
+//    @JsonView(StudentView.Degrees.class)
     @PutMapping("/students/{id}/degrees")
     public ResponseEntity updateStudentDegrees(
-            @PathVariable(value = "id") Integer studentId,
-            @RequestBody List<StudentDegreeDTO> studentDegreesDTO
+            @RequestBody List<StudentDegreeDTO> studentDegreesDTOs,
+            @CurrentUser ApplicationUser user
     ) {
-        if (checkId(studentDegreesDTO)) {
-            return ResponseEntity.unprocessableEntity().body("[StudentDegree]: Id не може бути null");
-        }
-
         try {
-            List<StudentDegree> studentDegrees = Mapper.strictMap(studentDegreesDTO, StudentDegree.class);
-            Student student = studentService.findById(studentId);
+            validateStudentDegreesUpdates(studentDegreesDTOs);
+            List<Integer> studentDegreeIds = studentDegreesDTOs.stream().map(StudentDegreeDTO::getId).collect(Collectors.toList());
+            List<StudentDegree> studentDegrees = studentDegreeService.getActiveByIdsAndFaculty(studentDegreeIds, user.getFaculty().getId());
 
-            studentDegrees.forEach(studentDegree -> {
-                Integer groupId = studentDegreesDTO.get(studentDegrees.indexOf(studentDegree)).getStudentGroupId();
-                studentDegree.setStudentGroup(getStudentGroup(groupId));
-                studentDegree.setSpecialization(studentDegree.getStudentGroup().getSpecialization());
-                studentDegree.setStudent(student);
-            });
-
+            for (StudentDegree sd : studentDegrees) {
+                StudentDegreeDTO currSdDto = studentDegreesDTOs.stream().filter(sdDto -> sdDto.getId() == sd.getId()).findFirst().get();
+                Mapper.mapStudentDegreeDtoToStudentDegreeSimpleFields(currSdDto, sd);
+                if ((sd.getStudentGroup() == null && currSdDto.getStudentGroupId() != 0) ||
+                        (sd.getStudentGroup() != null && sd.getStudentGroup().getId() != currSdDto.getStudentGroupId())) {
+                    sd.setStudentGroup(getStudentGroup(currSdDto.getStudentGroupId()));
+                    sd.setSpecialization(sd.getStudentGroup().getSpecialization());
+                }
+            }
             studentDegreeService.update(studentDegrees);
             return ResponseEntity.ok().build();
         } catch (Exception exception) {
@@ -187,13 +191,24 @@ public class StudentDegreeController {
         }
     }
 
-    private boolean checkId(List<StudentDegreeDTO> studentDegreeDTOs) {
-        for (StudentDegreeDTO sd : studentDegreeDTOs) {
-            if (sd.getId() == null) {
-                return true;
-            }
+    private void validateStudentDegreesUpdates(List<StudentDegreeDTO> studentDegreesDTOs) throws OperationCannotBePerformedException {
+        if (studentDegreesDTOs == null || studentDegreesDTOs.size()== 0) {
+            String exceptionMessage = "Список студентів не може бути порожнім. Зверніться до адміністратора або розробника системи";
+            throw new OperationCannotBePerformedException(exceptionMessage);
         }
-        return false;
+        if (isAnyStudentDegreeMissingId(studentDegreesDTOs)) {
+            String exceptionMessage = "Отримано некоректну інформацію. Зверніться до адміністратора або розробника системи";
+            throw new OperationCannotBePerformedException(exceptionMessage);
+        }
+        Set<Integer> distinctIds = studentDegreesDTOs.stream().map(sd -> sd.getId()).collect(Collectors.toSet());
+        if (distinctIds.size() != studentDegreesDTOs.size()) {
+            String exceptionMessage = "Не можна двічі зберегти одного і того ж студента. Зверніться до адміністратора або розробника системи";
+            throw new OperationCannotBePerformedException(exceptionMessage);
+        }
+    }
+
+    private boolean isAnyStudentDegreeMissingId(List<StudentDegreeDTO> studentDegreeDTOs) {
+        return studentDegreeDTOs.stream().anyMatch((studentDegreeDTO) -> studentDegreeDTO.getId() == null);
     }
 
     private StudentGroup getStudentGroup(Integer groupId) {
@@ -234,6 +249,45 @@ public class StudentDegreeController {
             return ResponseEntity.ok().build();
         } catch (Exception exception) {
             return handleException(exception);
+        }
+    }
+
+    @PostMapping("/students/record-book-numbers")
+    public ResponseEntity assignRecordBookNumbersToStudents(
+            @RequestBody Map<Integer, String> studentDegreeIdsAndRecordBooksNumbers,
+            @CurrentUser ApplicationUser user) {
+        try {
+            validateInputDataForAssignRecordBookNumbersToStudents(studentDegreeIdsAndRecordBooksNumbers);
+            List<StudentDegree> studentDegrees =
+                    studentDegreeService.getByIds(new ArrayList<>(studentDegreeIdsAndRecordBooksNumbers.keySet()));
+            facultyAuthorizationService.verifyAccessibilityOfStudentDegrees(user, studentDegrees);
+            if (studentDegrees.isEmpty()) {
+                String message = "За переданими даними жодного студента не було знайдено для призначення " +
+                        "номеру залікової книжки. Зверніться до адміністратора або розробника системи.";
+                throw new NotFoundException(message);
+            }
+            studentDegreeService.assignRecordBookNumbersToStudents(studentDegreeIdsAndRecordBooksNumbers);
+            return ResponseEntity.ok().build();
+        } catch (Exception exception) {
+            return handleException(exception);
+        }
+    }
+
+    private void validateInputDataForAssignRecordBookNumbersToStudents(
+            Map<Integer, String> studentDegreeToRecordNumber
+    ) throws OperationCannotBePerformedException {
+        if (studentDegreeToRecordNumber.size() == 0) {
+            String message = "Для призначення номеру залікової книжки потрібно передати хоча б одного студента.";
+            throw new OperationCannotBePerformedException(message);
+        }
+        if (studentDegreeToRecordNumber.values().stream().anyMatch(item -> Objects.isNull(item) || item.isEmpty())) {
+            String message = "Номер залікової книжки не може бути порожнім.";
+            throw new OperationCannotBePerformedException(message);
+        }
+        Set<String> recordBookNumberSet = new HashSet<>(studentDegreeToRecordNumber.values());
+        if (recordBookNumberSet.size() != studentDegreeToRecordNumber.size()) {
+            String message = "Номер залікової книжки не може бути однаковим у декількох студентів";
+            throw new OperationCannotBePerformedException(message);
         }
     }
 
